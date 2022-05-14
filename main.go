@@ -51,8 +51,7 @@ func fetch_ip_address(url string) (string, error) {
 }
 
 func set_ip_address(ipaddrstr string) (bool, error) {
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := get_k8s_config()
 	if err != nil {
 		return false, err
 	}
@@ -94,13 +93,21 @@ func set_ip_address(ipaddrstr string) (bool, error) {
 	return true, nil
 }
 
-func check_status() (bool, error) {
+func get_k8s_config() (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
+	}
+	return config, nil
+}
+
+func check_status() (bool, error) {
+	config, err := get_k8s_config()
+	if err != nil {
+		return false, err
 	}
 
 	// creates the clientset
