@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,16 +65,17 @@ func set_ip_address(ipaddrstr string) (bool, error) {
 	trycount := 0
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		trycount += 1
+		servicesApi := clientset.CoreV1().Services(*namespace)
 
 		// Fetch existing version
-		result, getErr := clientset.CoreV1().Services(*namespace).Get(*servicename, metav1.GetOptions{})
+		result, getErr := servicesApi.Get(context.TODO(), *servicename, metav1.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("Failed to get latest version of Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, getErr)
 		}
 
 		// Update with new IP address
 		result.Spec.ExternalName = ipaddrstr
-		_, updateErr := clientset.CoreV1().Services(*namespace).Update(result)
+		_, updateErr := servicesApi.Update(context.TODO(), result, metav1.UpdateOptions{})
 		if updateErr != nil {
 			return fmt.Errorf("Failed to update Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, updateErr)
 		}
@@ -104,13 +106,14 @@ func check_status() (bool, error) {
 		return false, err
 	}
 
-	services, err := clientset.CoreV1().Services(*namespace).List(metav1.ListOptions{})
+	servicesApi := clientset.CoreV1().Services(*namespace)
+	services, err := servicesApi.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
 	fmt.Printf("There are %d services in the '%s' namespace\n", len(services.Items), *namespace)
 
-	_, err = clientset.CoreV1().Services(*namespace).Get(*servicename, metav1.GetOptions{})
+	_, err = clientset.CoreV1().Services(*namespace).Get(context.TODO(), *servicename, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	} else if errors.IsNotFound(err) {
