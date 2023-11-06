@@ -207,10 +207,12 @@ func main() {
 
 	// Main loop
 	for {
-		if interval_seconds > 0 {
+		if interval_seconds < 1 {
+			time.Sleep(time.Duration(10) * time.Second)
+		} else {
 			go runAtInterval()
+			time.Sleep(time.Duration(interval_seconds) * time.Second)
 		}
-		time.Sleep(time.Duration(interval_seconds) * time.Second)
 	}
 }
 
