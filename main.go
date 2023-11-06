@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,13 +12,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"context"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -26,40 +27,48 @@ var (
 	namespace              *string
 	servicename            *string
 	kubeconfig             *string
-	interval_seconds       = 60
 	last_ip_address        = ""
 )
 
-func fetch_ip_address(url string) (string, error) {
+func fetchIPAddress(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
+
+	var bodyBytes []byte
+	buf := make([]byte, 1024)
+	for {
+		n, err := resp.Body.Read(buf)
+		if err != nil && err != io.EOF {
+			return "", err
+		}
+		if n == 0 {
+			break
+		}
+		bodyBytes = append(bodyBytes, buf[:n]...)
 	}
 
-	ipaddr := strings.TrimSpace(string(body))
+	ipaddr := strings.TrimSpace(string(bodyBytes))
 	trial := net.ParseIP(ipaddr)
 	if trial.To4() == nil {
-		return "", fmt.Errorf("%v is not an IPv4 address\n", trial)
+		return "", fmt.Errorf("%v is not an IPv4 address", trial)
 	}
 
 	return ipaddr, nil
 }
 
-func set_ip_address(ipaddrstr string) (bool, error) {
-	config, err := get_k8s_config()
+func setIPAddress(ipaddrstr string) error {
+	config, err := getK8SConfig()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	trycount := 0
@@ -70,30 +79,30 @@ func set_ip_address(ipaddrstr string) (bool, error) {
 		// Fetch existing version
 		result, getErr := servicesApi.Get(context.TODO(), *servicename, metav1.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("Failed to get latest version of Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, getErr)
+			return fmt.Errorf("failed to get latest version of Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, getErr)
 		}
 
 		// Update with new IP address
 		result.Spec.ExternalName = ipaddrstr
 		_, updateErr := servicesApi.Update(context.TODO(), result, metav1.UpdateOptions{})
 		if updateErr != nil {
-			return fmt.Errorf("Failed to update Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, updateErr)
+			return fmt.Errorf("failed to update Service '%s/%s' (try %d): %v", *namespace, *servicename, trycount, updateErr)
 		}
 
 		return nil
 	})
 	if retryErr != nil {
-		return false, retryErr
+		return retryErr
 	}
 
 	// Record that we've updated it
-	fmt.Printf("Service '%s/%s' updated to point to IP address %s\n", *namespace, *servicename, ipaddrstr)
+	log.Infof("Service '%s/%s' updated to point to IP address %s\n", *namespace, *servicename, ipaddrstr)
 	last_ip_address = ipaddrstr
 
-	return true, nil
+	return nil
 }
 
-func get_k8s_config() (*rest.Config, error) {
+func getK8SConfig() (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -104,8 +113,8 @@ func get_k8s_config() (*rest.Config, error) {
 	return config, nil
 }
 
-func check_status() (bool, error) {
-	config, err := get_k8s_config()
+func checkStatus() (bool, error) {
+	config, err := getK8SConfig()
 	if err != nil {
 		return false, err
 	}
@@ -121,16 +130,16 @@ func check_status() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	fmt.Printf("There are %d services in the '%s' namespace\n", len(services.Items), *namespace)
+	log.Debugf("There are %d services in the '%s' namespace\n", len(services.Items), *namespace)
 
 	_, err = clientset.CoreV1().Services(*namespace).Get(context.TODO(), *servicename, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	} else if errors.IsNotFound(err) {
-		fmt.Printf("Service '%s/%s' not found.\n", *namespace, *servicename)
+		err = fmt.Errorf("service '%s/%s' not found", *namespace, *servicename)
+		return false, err
 	} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-		fmt.Printf("Error getting service %v\n", statusError.ErrStatus.Message)
-	} else if err != nil {
+		err = fmt.Errorf("error getting service: %v", statusError.ErrStatus.Message)
 		return false, err
 	}
 	fmt.Printf("Service '%s/%s' found.\n", *namespace, *servicename)
@@ -138,8 +147,8 @@ func check_status() (bool, error) {
 	return true, nil
 }
 
-func run_at_interval() {
-	ip_address, err := fetch_ip_address(*ip_address_service_url)
+func runAtInterval() {
+	ip_address, err := fetchIPAddress(*ip_address_service_url)
 	if err != nil {
 		fmt.Printf("Error getting IP address %v\n", err)
 		return
@@ -151,8 +160,7 @@ func run_at_interval() {
 	}
 
 	fmt.Printf("Setting updated IP '%s'\n", ip_address)
-	_, err = set_ip_address(ip_address)
-	if err != nil {
+	if err = setIPAddress(ip_address); err != nil {
 		fmt.Printf("ERROR: Unable to set IP address (%s): %v", ip_address, err)
 		return
 	}
@@ -166,6 +174,8 @@ func main() {
 	}
 
 	ip_address_service_url = flag.String("ip-address-service-url", "http://icanhazip.com", "URL of dynamic IP address service to query (optional)")
+	interval_seconds := *flag.Int("interval-seconds", 60, "Seconds to wait between checks (0 to disable checks)")
+	listen_address := *flag.String("listen-address", "0.0.0.0:8080", "Address to bind to for webhook")
 	namespace = flag.String("namespace", "", "Namespace of Service to update")
 	servicename = flag.String("servicename", "", "Name of Service to update")
 	flag.Parse()
@@ -185,14 +195,21 @@ func main() {
 	}
 
 	// Check status
-	_, err = check_status()
+	_, err = checkStatus()
 	if err != nil {
 		panic(err.Error())
 	}
 
+	// Start webhook service
+	if listen_address != "" {
+		startServer(listen_address)
+	}
+
 	// Main loop
-	for true {
-		go run_at_interval()
+	for {
+		if interval_seconds > 0 {
+			go runAtInterval()
+		}
 		time.Sleep(time.Duration(interval_seconds) * time.Second)
 	}
 }
