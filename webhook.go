@@ -9,7 +9,6 @@ import (
 
 type WebhookData struct {
 	IPAddress string `json:"ip_address"`
-	// Add other fields from your JSON here
 }
 
 type Response struct {
@@ -19,6 +18,7 @@ type Response struct {
 
 func startServer(listen_address string) {
 	http.HandleFunc("/", handleWebhook)
+	http.HandleFunc("/health", healthCheck)
 	http.ListenAndServe(listen_address, nil)
 }
 
@@ -73,7 +73,10 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Do something with the result if needed
 	response(w, http.StatusOK, "Updated DNS configuration")
 	log.Infof("Updated DNS configuration successfully")
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
