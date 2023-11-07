@@ -96,7 +96,7 @@ func setIPAddress(ipaddrstr string) error {
 	}
 
 	// Record that we've updated it
-	log.Infof("Service '%s/%s' updated to point to IP address %s\n", *namespace, *servicename, ipaddrstr)
+	log.Infof("Service '%s/%s' updated to point to IP address %s", *namespace, *servicename, ipaddrstr)
 	last_ip_address = ipaddrstr
 
 	return nil
@@ -130,7 +130,7 @@ func checkStatus() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	log.Debugf("There are %d services in the '%s' namespace\n", len(services.Items), *namespace)
+	log.Debugf("There are %d services in the '%s' namespace", len(services.Items), *namespace)
 
 	_, err = clientset.CoreV1().Services(*namespace).Get(context.TODO(), *servicename, metav1.GetOptions{})
 	if err != nil {
@@ -142,7 +142,7 @@ func checkStatus() (bool, error) {
 		err = fmt.Errorf("error getting service: %v", statusError.ErrStatus.Message)
 		return false, err
 	}
-	fmt.Printf("Service '%s/%s' found.\n", *namespace, *servicename)
+	fmt.Printf("Service '%s/%s' found.", *namespace, *servicename)
 
 	return true, nil
 }
@@ -150,16 +150,16 @@ func checkStatus() (bool, error) {
 func runAtInterval() {
 	ip_address, err := fetchIPAddress(*ip_address_service_url)
 	if err != nil {
-		fmt.Printf("Error getting IP address %v\n", err)
+		fmt.Printf("Error getting IP address %v", err)
 		return
 	}
 
 	if last_ip_address == ip_address {
-		//fmt.Printf("Same as last time (%s).\n", ip_address)
+		//fmt.Printf("Same as last time (%s).", ip_address)
 		return
 	}
 
-	fmt.Printf("Setting updated IP '%s'\n", ip_address)
+	fmt.Printf("Setting updated IP '%s'n", ip_address)
 	if err = setIPAddress(ip_address); err != nil {
 		fmt.Printf("ERROR: Unable to set IP address (%s): %v", ip_address, err)
 		return
