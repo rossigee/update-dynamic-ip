@@ -1,5 +1,5 @@
 # builder image
-FROM golang:1.24-alpine as builder
+FROM golang:1.24-alpine AS builder
 RUN mkdir /build
 ADD *.go go.mod go.sum /build/
 WORKDIR /build
