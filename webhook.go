@@ -8,7 +8,8 @@ import (
 )
 
 type WebhookData struct {
-	IPAddress string `json:"ip_address"`
+	ServiceName string `json:"service_name"`
+	IPAddress   string `json:"ip_address"`
 }
 
 type Response struct {
@@ -16,8 +17,10 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-func startServer(listen_address string) {
-	http.HandleFunc("/", handleWebhook)
+func startServer(listen_address string, client K8sClient) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handleWebhook(w, r, client)
+	})
 	http.HandleFunc("/health", healthCheck)
 	http.ListenAndServe(listen_address, nil)
 }
@@ -27,7 +30,7 @@ func response(w http.ResponseWriter, statusCode int, message string) {
 	w.WriteHeader(statusCode)
 
 	status := "ok"
-	if statusCode != 200 {
+	if statusCode != http.StatusOK {
 		status = "error"
 	}
 	response := Response{
@@ -38,13 +41,14 @@ func response(w http.ResponseWriter, statusCode int, message string) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func handleWebhook(w http.ResponseWriter, r *http.Request) {
+func handleWebhook(w http.ResponseWriter, r *http.Request, client K8sClient) {
 	if r.Method != http.MethodPost {
 		response(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	var data []WebhookData
+	var data WebhookData
+	log.Debug(r.Body)
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&data); err != nil {
 		response(w, http.StatusBadRequest, "Failed to parse JSON")
@@ -52,31 +56,26 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(data) < 1 {
-		response(w, http.StatusBadRequest, "No entries provided")
-		log.Errorf("No entries provided in JSON")
+	if data.ServiceName == "" || data.IPAddress == "" {
+		response(w, http.StatusBadRequest, "Service name ('service_name') and/or IP address ('ip_address') missing from JSON payload")
+		log.Errorf("Service name ('service_name') and/or IP address ('ip_address') missing from JSON payload")
 		return
 	}
-	if len(data) > 1 {
-		response(w, http.StatusBadRequest, "Unexpected number of entries provided")
-		log.Warnf("Unexpected number of entries provided in JSON: %d", len(data))
-	}
+	serviceName := data.ServiceName
+	ipAddress := data.IPAddress
 
-	entry := data[0]
-	ipAddress := entry.IPAddress
-
-	log.Infof("Received webhook with IP address: %s", ipAddress)
-	err := setIPAddress(ipAddress)
+	log.Debugf("Received webhook for service '%s' with IP address: %s", serviceName, ipAddress)
+	err := setIPAddress(client, data.ServiceName, data.IPAddress)
 	if err != nil {
-		response(w, http.StatusInternalServerError, "Failed to set IP address")
-		log.Errorf("Failed to set IP address: %v", err)
+		log.Errorf("Failed to set IP address for service '%s' to '%s': %v", serviceName, ipAddress, err)
+		response(w, http.StatusInternalServerError, "Failed to update service")
 		return
 	}
 
 	response(w, http.StatusOK, "Updated DNS configuration")
-	log.Infof("Updated DNS configuration successfully")
+	log.Infof("Updated DNS for service '%s' to '%s'.", serviceName, ipAddress)
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	response(w, http.StatusOK, "healthy")
 }
