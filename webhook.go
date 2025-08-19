@@ -22,7 +22,7 @@ func startServer(listen_address string, client K8sClient) {
 		handleWebhook(w, r, client)
 	})
 	http.HandleFunc("/health", healthCheck)
-	http.ListenAndServe(listen_address, nil)
+	log.Fatal(http.ListenAndServe(listen_address, nil))
 }
 
 func response(w http.ResponseWriter, statusCode int, message string) {
@@ -38,7 +38,9 @@ func response(w http.ResponseWriter, statusCode int, message string) {
 		Message: message,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Errorf("Failed to encode response: %v", err)
+	}
 }
 
 func handleWebhook(w http.ResponseWriter, r *http.Request, client K8sClient) {

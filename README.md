@@ -11,6 +11,12 @@ I want:
 * The home office network to maintain an ExternalDNS service entry in the K8S cluster, containing the latest dynamic IP address.
 * An annotation on the ExternalDNS service so that `external-dns` maintains an A record with my domain hosting provider.
 
+## Requirements
+
+* Go 1.25 or later (for development)
+* Kubernetes cluster with appropriate RBAC permissions
+* Docker (for containerized deployment)
+
 ## Setup cluster resources
 
 First, create a namespace called 'dynamicips'. I'm using the plural term because there's no reason why this setup couldn't be used to track and the dynamic IPs of multiple branch offices and maintain them in an (internal or external) DNS system.
@@ -162,3 +168,76 @@ dig @1.1.1.1 A myhouse1.dynamicip.acme.com
 ```
 
 There you have it. I hope you find this useful.
+
+## Development
+
+### Building from Source
+
+This project requires Go 1.25 or later.
+
+```bash
+# Clone the repository
+git clone https://github.com/rossigee/update-dynamic-ip.git
+cd update-dynamic-ip
+
+# Build the binary
+make build
+
+# Or use Go directly
+go build -o update-dynamic-ip
+```
+
+### Available Make Targets
+
+The project includes a Makefile with the following targets:
+
+* `make build` - Build the binary
+* `make test` - Run all tests
+* `make lint` - Run golangci-lint v2.4.0 for code quality checks
+* `make clean` - Clean build artifacts
+* `make tidy` - Tidy Go modules
+* `make deps` - Download dependencies
+* `make check` - Run tests and linting
+* `make all` - Complete build pipeline (clean, deps, build, test, lint)
+
+### Testing
+
+Run the test suite:
+
+```bash
+make test
+```
+
+Or use Go directly:
+
+```bash
+go test -v ./...
+```
+
+### Code Quality
+
+This project uses golangci-lint v2.4.0 for code quality checks:
+
+```bash
+make lint
+```
+
+The linter will check for:
+* Error handling
+* Code simplicity and style
+* Potential security issues
+* Performance optimizations
+* Code duplication
+* Formatting consistency
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Make your changes
+4. Run tests and linting (`make check`)
+5. Commit your changes (`git commit -am 'Add some feature'`)
+6. Push to the branch (`git push origin feature/your-feature`)
+7. Create a Pull Request
+
+Please ensure all tests pass and code passes linting before submitting a PR.

@@ -1,8 +1,8 @@
 module github.com/rossigee/update-dynamic-ip
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.2
+toolchain go1.25.0
 
 require (
 	github.com/stretchr/testify v1.10.0
