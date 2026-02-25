@@ -193,7 +193,7 @@ The project includes a Makefile with the following targets:
 
 * `make build` - Build the binary
 * `make test` - Run all tests
-* `make lint` - Run golangci-lint v2.4.0 for code quality checks
+* `make lint` - Run golangci-lint v2.9.0 for code quality checks
 * `make clean` - Clean build artifacts
 * `make tidy` - Tidy Go modules
 * `make deps` - Download dependencies
@@ -216,7 +216,7 @@ go test -v ./...
 
 ### Code Quality
 
-This project uses golangci-lint v2.4.0 for code quality checks:
+This project uses golangci-lint v2.9.0 for code quality checks:
 
 ```bash
 make lint

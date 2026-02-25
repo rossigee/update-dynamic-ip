@@ -10,7 +10,7 @@ GOMOD=$(GOCMD) mod
 BINARY_NAME=update-dynamic-ip
 
 # golangci-lint version
-GOLANGCI_LINT_VERSION=v2.4.0
+GOLANGCI_LINT_VERSION=v2.9.0
 
 # Build the binary
 build:
@@ -20,11 +20,11 @@ build:
 test:
 	$(GOTEST) -v ./...
 
-# Run linter with golangci-lint v2.4.0
+# Run linter with golangci-lint v2.9.0
 lint: install-golangci-lint
 	./bin/golangci-lint run
 
-# Install golangci-lint v2.4.0 locally
+# Install golangci-lint v2.9.0 locally
 install-golangci-lint:
 	@if [ ! -f ./bin/golangci-lint ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
