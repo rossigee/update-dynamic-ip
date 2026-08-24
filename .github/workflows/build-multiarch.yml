@@ -15,11 +15,11 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4.3.0
         with:
           version: ${{ env.BUILDX_VERSION }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
@@ -30,7 +30,7 @@ jobs:
 
       - name: Docker meta
         id: metatags
-        uses: docker/metadata-action@v3
+        uses: docker/metadata-action@v6.2.0
         with:
           images: rossigee/update-dynamic-ip
           tags: |
@@ -38,7 +38,7 @@ jobs:
             type=sha
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           platforms: linux/amd64,linux/arm/v7
